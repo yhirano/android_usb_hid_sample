@@ -1,6 +1,7 @@
 package com.github.yhirano.usbhid
 
 import android.util.Log
+import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.util.*
@@ -15,6 +16,14 @@ class IoManager(private val port: Port, var listener: Listener? = null) : Runnab
     enum class State {
         STOPPED, RUNNING, STOPPING
     }
+
+    private enum class WorkResult {
+        WRITE_DATA_QUEUE_IS_EMPTY,
+        WRITE_DATA_QUEUE_IS_NOT_EMPTY,
+        CAUSE_WRITE_ERROR
+    }
+
+    var writeDataAllTogether = false
 
     var readTimeout: Int = 5
     var writeTimeout: Int = 5
@@ -32,18 +41,18 @@ class IoManager(private val port: Port, var listener: Listener? = null) : Runnab
 
         try {
             while (true) {
-                val state: State
-                synchronized(this.state) {
-                    state = this.state
-                }
-
                 if (state != State.RUNNING) {
                     break
                 }
 
-                work()
+                val workResult = work()
 
-                Thread.sleep(10)
+                if (state != State.RUNNING) {
+                    break
+                }
+                if (workResult == WorkResult.WRITE_DATA_QUEUE_IS_EMPTY) {
+                    Thread.sleep(1)
+                }
             }
         } catch (e: java.lang.Exception) {
             Log.w(TAG, "Occurred exception. exception=\"${e.message}\"", e)
@@ -69,7 +78,7 @@ class IoManager(private val port: Port, var listener: Listener? = null) : Runnab
         }
     }
 
-    private fun work() {
+    private fun work(): WorkResult {
         try {
             val length = port.read(readBuffer.array(), readTimeout)
             if (length > 0) {
@@ -84,17 +93,35 @@ class IoManager(private val port: Port, var listener: Listener? = null) : Runnab
             readBuffer.clear()
         }
 
-        try {
-            val data: ByteArray?
-            synchronized(writeDataQueue) {
-                data = writeDataQueue.poll()
+        return try {
+            val data = if (writeDataAllTogether) {
+                synchronized(writeDataQueue) {
+                    val outStream = ByteArrayOutputStream()
+                    while (true) {
+                        val data = writeDataQueue.poll() ?: break
+                        outStream.write(data)
+                    }
+                    return@synchronized if (outStream.size() > 0) {
+                        outStream.toByteArray()
+                    } else {
+                        null
+                    }
+                }
+            } else {
+                synchronized(writeDataQueue) {
+                    writeDataQueue.poll()
+                }
             }
             if (data != null) {
                 port.write(data, writeTimeout)
+                WorkResult.WRITE_DATA_QUEUE_IS_NOT_EMPTY
+            } else {
+                WorkResult.WRITE_DATA_QUEUE_IS_EMPTY
             }
         } catch (e: IOException) {
             Log.w(TAG, "Occurred exception when USB writing. exception=\"${e.message}\"", e)
             listener?.onRunError(e)
+            WorkResult.CAUSE_WRITE_ERROR
         }
     }
 
