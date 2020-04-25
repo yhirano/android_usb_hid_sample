@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".MainActivity">
+
+    <androidx.appcompat.widget.AppCompatToggleButton
+        android:id="@+id/led1_button"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:textOff="LED1"
+        android:textOn="LED1"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/led2_button"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <androidx.appcompat.widget.AppCompatToggleButton
+        android:id="@+id/led2_button"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:textOff="LED2"
+        android:textOn="LED2"
+        app:layout_constraintEnd_toStartOf="@id/led3_button"
+        app:layout_constraintStart_toEndOf="@id/led1_button"
+        app:layout_constraintTop_toTopOf="@id/led1_button" />
+
+    <androidx.appcompat.widget.AppCompatToggleButton
+        android:id="@+id/led3_button"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:textOff="LED3"
+        android:textOn="LED3"
+        app:layout_constraintEnd_toStartOf="@id/led4_button"
+        app:layout_constraintStart_toEndOf="@id/led2_button"
+        app:layout_constraintTop_toTopOf="@id/led2_button" />
+
+    <androidx.appcompat.widget.AppCompatToggleButton
+        android:id="@+id/led4_button"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="16dp"
+        android:textOff="LED4"
+        android:textOn="LED4"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@id/led3_button"
+        app:layout_constraintTop_toTopOf="@id/led3_button" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>
