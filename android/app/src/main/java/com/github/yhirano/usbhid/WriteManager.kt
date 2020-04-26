@@ -3,13 +3,10 @@ package com.github.yhirano.usbhid
 import android.util.Log
 import java.io.ByteArrayOutputStream
 import java.io.IOException
-import java.nio.ByteBuffer
 import java.util.*
 
-class IoManager(private val port: Port, var listener: Listener? = null) : Runnable {
+class WriteManager(private val port: Port, var listener: Listener? = null) : Runnable {
     interface Listener {
-        fun onNewData(data: ByteArray)
-
         fun onRunError(e: Exception)
     }
 
@@ -18,20 +15,18 @@ class IoManager(private val port: Port, var listener: Listener? = null) : Runnab
     }
 
     private enum class WorkResult {
-        WRITE_DATA_QUEUE_IS_EMPTY,
-        WRITE_DATA_QUEUE_IS_NOT_EMPTY,
-        CAUSE_WRITE_ERROR
+        QUEUE_IS_EMPTY,
+        WROTE_DATA,
+        CAUSE_WRITE_ERROR,
     }
 
     var writeDataAllTogether = false
 
-    var readTimeout: Int = 5
-    var writeTimeout: Int = 5
+    var timeout: Int = 10
 
     private var state = State.STOPPED
 
     private val writeDataQueue = LinkedList<ByteArray>()
-    private val readBuffer = ByteBuffer.allocate(4096)
 
     override fun run() {
         synchronized(state) {
@@ -50,7 +45,7 @@ class IoManager(private val port: Port, var listener: Listener? = null) : Runnab
                 if (state != State.RUNNING) {
                     break
                 }
-                if (workResult == WorkResult.WRITE_DATA_QUEUE_IS_EMPTY) {
+                if (workResult == WorkResult.QUEUE_IS_EMPTY) {
                     Thread.sleep(1)
                 }
             }
@@ -79,20 +74,6 @@ class IoManager(private val port: Port, var listener: Listener? = null) : Runnab
     }
 
     private fun work(): WorkResult {
-        try {
-            val length = port.read(readBuffer.array(), readTimeout)
-            if (length > 0) {
-                val data = ByteArray(length)
-                readBuffer.get(data, 0, length)
-                listener?.onNewData(data)
-            }
-        } catch (e: IOException) {
-            Log.w(TAG, "Occurred exception when USB reading. exception=\"${e.message}\"", e)
-            listener?.onRunError(e)
-        } finally {
-            readBuffer.clear()
-        }
-
         return try {
             val data = if (writeDataAllTogether) {
                 synchronized(writeDataQueue) {
@@ -112,11 +93,12 @@ class IoManager(private val port: Port, var listener: Listener? = null) : Runnab
                     writeDataQueue.poll()
                 }
             }
+
             if (data != null) {
-                port.write(data, writeTimeout)
-                WorkResult.WRITE_DATA_QUEUE_IS_NOT_EMPTY
+                port.write(data, timeout)
+                WorkResult.WROTE_DATA
             } else {
-                WorkResult.WRITE_DATA_QUEUE_IS_EMPTY
+                WorkResult.QUEUE_IS_EMPTY
             }
         } catch (e: IOException) {
             Log.w(TAG, "Occurred exception when USB writing. exception=\"${e.message}\"", e)
@@ -126,6 +108,6 @@ class IoManager(private val port: Port, var listener: Listener? = null) : Runnab
     }
 
     companion object {
-        private const val TAG = "UsbHid"
+        private const val TAG = "UsbHid/WriteManager"
     }
 }

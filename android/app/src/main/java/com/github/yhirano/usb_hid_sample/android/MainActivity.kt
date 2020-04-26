@@ -2,7 +2,6 @@ package com.github.yhirano.usb_hid_sample.android
 
 import android.os.Bundle
 import android.util.Log
-import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.AppCompatToggleButton
@@ -31,7 +30,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        usbHid = UsbHid(applicationContext, 0x1234, 0x0006, object : UsbHid.ReadListener {
+        usbHid = UsbHid(applicationContext, 0x1234, 0x0006, object : UsbHid.Listener {
             override fun onRunError(e: Exception) {
                 Log.w(TAG, "Occurred USB HID error.", e)
             }

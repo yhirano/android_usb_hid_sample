@@ -15,7 +15,7 @@ class UsbHid constructor(
     private val context: Context,
     private val vendorId: Int,
     private val productId: Int,
-    var readListener: ReadListener? = null
+    var listener: Listener? = null
 ) {
     enum class State {
         Uninitialized,
@@ -24,7 +24,7 @@ class UsbHid constructor(
         Working
     }
 
-    interface ReadListener {
+    interface Listener {
         fun onNewData(data: ByteArray)
 
         fun onRunError(e: Exception)
@@ -41,7 +41,8 @@ class UsbHid constructor(
 
     private var port: Port? = null
 
-    private var ioManager: IoManager? = null
+    private var readManager: ReadManager? = null
+    private var writeManager: WriteManager? = null
 
     private var isRegisterUsbPermissionReceiver = false
 
@@ -66,11 +67,8 @@ class UsbHid constructor(
     }
 
     fun write(data: ByteArray) {
-        if (ioManager == null) {
-            Log.w(TAG, "Failed to write data to USB HID because UsbHid class isn't open.")
-            return
-        }
-        ioManager?.writeAsync(data)
+        writeManager?.writeAsync(data)
+            ?: Log.w(TAG, "Failed to write data to USB HID because UsbHid class isn't open.")
     }
 
     private fun connect(): State {
@@ -134,26 +132,33 @@ class UsbHid constructor(
             Log.w(TAG, "Has no USB device. Maybe not initialize yet.")
             return
         }
-        val ioManager = IoManager(port, object : IoManager.Listener {
+        val readManager = ReadManager(port, object : ReadManager.Listener {
             override fun onNewData(data: ByteArray) {
-                readListener?.onNewData(data)
+                listener?.onNewData(data)
             }
 
             override fun onRunError(e: Exception) {
-                readListener?.onRunError(e)
+                listener?.onRunError(e)
             }
         })
-        this.ioManager = ioManager
-        Executors.newSingleThreadExecutor().submit(ioManager)
+        val writeManager = WriteManager(port, object : WriteManager.Listener {
+            override fun onRunError(e: Exception) {
+                listener?.onRunError(e)
+            }
+        })
+        this.readManager = readManager
+        this.writeManager = writeManager
+        Executors.newSingleThreadExecutor().submit(readManager)
+        Executors.newSingleThreadExecutor().submit(writeManager)
     }
 
     private fun stopIoManager() {
-        if (ioManager == null) {
-            Log.w(TAG, "Has no serialIoManager. Maybe not initialize yet.")
-            return
-        }
-        ioManager?.stop()
-        ioManager = null
+        readManager?.stop()
+            ?: Log.w(TAG, "Has no data reading thread. Maybe not initialize yet.")
+        readManager = null
+        writeManager?.stop()
+            ?: Log.w(TAG, "Has no data writing thread. Maybe not initialize yet.")
+        writeManager = null
     }
 
     private val usbPermissionReceiver = object : BroadcastReceiver() {
