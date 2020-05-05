@@ -30,20 +30,25 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        usbHid = UsbHid(applicationContext, 0x1234, 0x0006, object : UsbHid.Listener {
-            override fun onRunError(e: Exception) {
-                Log.w(TAG, "Occurred USB HID error.", e)
-            }
+        usbHid = UsbHid(applicationContext, 0x1234, 0x0006).apply {
+            listener = object : UsbHid.Listener {
+                override fun onRunError(e: Exception) {
+                    Log.w(TAG, "Occurred USB HID error.", e)
+                }
 
-            override fun onNewData(data: ByteArray) {
-                Log.i(TAG, "Receive data from USB HID. data=${data.contentToString()}")
-                runOnUiThread {
-                    Toast
-                        .makeText(this@MainActivity, data.contentToString(), Toast.LENGTH_SHORT)
-                        .show()
+                override fun onStateChanged(state: UsbHid.State) {
+                    Log.d(TAG, "USB HID device state changed. state=$state")
+                }
+
+                override fun onNewData(data: ByteArray) {
+                    Log.i(TAG, "Receive data from USB HID. data=${data.contentToString()}")
+                    runOnUiThread {
+                        Toast
+                            .makeText(this@MainActivity, data.contentToString(), Toast.LENGTH_SHORT)
+                            .show()
+                    }
                 }
             }
-        }).apply {
             openDevice()
         }
 

@@ -14,8 +14,7 @@ import java.util.concurrent.Executors
 class UsbHid constructor(
     private val context: Context,
     private val vendorId: Int,
-    private val productId: Int,
-    var listener: Listener? = null
+    private val productId: Int
 ) {
     enum class State {
         Uninitialized,
@@ -28,10 +27,22 @@ class UsbHid constructor(
         fun onNewData(data: ByteArray)
 
         fun onRunError(e: Exception)
+
+        fun onStateChanged(state: State)
     }
 
+    var listener: Listener? = null
+
     var state = State.Uninitialized
-        private set
+        private set(value) {
+            val changed = field != value
+
+            field = value
+
+            if (changed) {
+                listener?.onStateChanged(field)
+            }
+        }
 
     private val usbManager: UsbManager by lazy {
         context.getSystemService(Context.USB_SERVICE) as UsbManager
@@ -119,7 +130,6 @@ class UsbHid constructor(
         return if (port != null) {
             startIoManager()
             State.Working
-
         } else {
             Log.d(TAG, "Couldn't initialize port. Device has no read and write endpoint. port=\"${port}\"")
             State.FailedInitialize
