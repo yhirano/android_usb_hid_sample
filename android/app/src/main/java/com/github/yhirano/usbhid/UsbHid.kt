@@ -12,7 +12,7 @@ import android.util.Log
 import java.util.concurrent.Executors
 
 class UsbHid constructor(
-    private val context: Context,
+    context: Context,
     private val vendorId: Int,
     private val productId: Int
 ) {
@@ -33,6 +33,12 @@ class UsbHid constructor(
 
     var listener: Listener? = null
 
+    var writeRetry: Int = 0
+        set(value) {
+            field = value
+            writeManager?.retry = value
+        }
+
     var state = State.Uninitialized
         private set(value) {
             val changed = field != value
@@ -43,6 +49,8 @@ class UsbHid constructor(
                 listener?.onStateChanged(field)
             }
         }
+
+    private val context = context.applicationContext
 
     private val usbManager: UsbManager by lazy {
         context.getSystemService(Context.USB_SERVICE) as UsbManager
@@ -94,7 +102,7 @@ class UsbHid constructor(
 
         Log.d(TAG, "Found ${foundDevices.size} device(s).")
         foundDevices.forEachIndexed { i, device ->
-            Log.d(TAG, "  ${i + 1}: DeviceName=\"${device.deviceName}\", ManufacturerName=\"${device.manufacturerName}\", ProductName=\"${device.productName}\"")
+            Log.d(TAG, "  ${i + 1}: DeviceName=\"${device.deviceName}\", ManufacturerName=\"${device.manufacturerName}\", ProductName=\"${device.productName}\", VendorId=${String.format("0x%04X", device.vendorId)}, ProductId=${String.format("0x%04X", device.productId)}")
         }
 
         val device = foundDevices[0]
@@ -155,7 +163,9 @@ class UsbHid constructor(
             override fun onRunError(e: Exception) {
                 listener?.onRunError(e)
             }
-        })
+        }).apply {
+            retry = writeRetry
+        }
         this.readManager = readManager
         this.writeManager = writeManager
         Executors.newSingleThreadExecutor().submit(readManager)

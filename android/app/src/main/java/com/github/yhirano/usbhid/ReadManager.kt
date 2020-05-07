@@ -40,7 +40,7 @@ class ReadManager(private val port: Port, var listener: Listener? = null) : Runn
                 }
                 Thread.sleep(1)
             }
-        } catch (e: java.lang.Exception) {
+        } catch (e: Exception) {
             Log.w(TAG, "Occurred exception. exception=\"${e.message}\"", e)
             listener?.onRunError(e)
         } finally {

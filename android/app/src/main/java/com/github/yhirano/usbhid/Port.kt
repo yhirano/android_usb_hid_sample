@@ -30,13 +30,16 @@ class Port private constructor(
         return length
     }
 
+    /**
+     * @exception IOException Failed to write data to USB.
+     */
     fun write(data: ByteArray, timeout: Int) {
         try {
             connection.claimInterface(usbInterface, true)
 
             val length = connection.bulkTransfer(writeEndpoint, data, data.size, timeout)
             if (length <= 0) {
-                throw IOException("Failed to write data to USB.")
+                throw IOException("Failed to write data to USB. status=$length")
             }
         } finally {
             connection.releaseInterface(usbInterface)

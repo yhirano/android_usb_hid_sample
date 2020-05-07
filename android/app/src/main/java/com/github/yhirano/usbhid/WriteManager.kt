@@ -24,6 +24,12 @@ class WriteManager(private val port: Port, var listener: Listener? = null) : Run
 
     var timeout: Int = 10
 
+    /**
+     * Retry send data count.
+     * If it is less than or equal to 0, no retries.
+     */
+    var retry: Int = 0
+
     private var state = State.STOPPED
 
     private val writeDataQueue = LinkedList<ByteArray>()
@@ -49,7 +55,7 @@ class WriteManager(private val port: Port, var listener: Listener? = null) : Run
                     Thread.sleep(1)
                 }
             }
-        } catch (e: java.lang.Exception) {
+        } catch (e: Exception) {
             Log.w(TAG, "Occurred exception. exception=\"${e.message}\"", e)
             listener?.onRunError(e)
         } finally {
@@ -95,7 +101,7 @@ class WriteManager(private val port: Port, var listener: Listener? = null) : Run
             }
 
             if (data != null) {
-                port.write(data, timeout)
+                write(data, timeout, retry)
                 WorkResult.WROTE_DATA
             } else {
                 WorkResult.QUEUE_IS_EMPTY
@@ -107,7 +113,50 @@ class WriteManager(private val port: Port, var listener: Listener? = null) : Run
         }
     }
 
+    /**
+     * Write data to USB device.
+     *
+     * @param data Writing data
+     * @param retry Number of retries; if this number is less than or equal to 0, no retries.
+     * @exception IOException When data is not written to USB after the specified number of retries.
+     */
+    private fun write(data: ByteArray, timeout: Int, retry: Int) {
+        try {
+            port.write(data, timeout)
+        } catch (e: IOException) {
+            if (retry > 0) {
+                Log.d(
+                    TAG,
+                    "Retry send data because occurred exception when USB writing. data=${data.contentToHexString()}, retry=$retry, exception=\"${e.message}\""
+                )
+                write(data, timeout, retry - 1)
+            } else {
+                Log.w(
+                    TAG,
+                    "Failed to retry send data because occurred exception when USB writing. data=${data.contentToHexString()} exception=\"${e.message}\""
+                )
+                throw e
+            }
+        }
+    }
+
     companion object {
         private const val TAG = "UsbHid/WriteManager"
+
+        private fun ByteArray?.contentToHexString(): String {
+            if (this == null) return "null"
+            val iMax = this.size - 1
+            if (iMax == -1) return "[]"
+
+            val b = StringBuilder()
+            b.append('[')
+            var i = 0
+            while (true) {
+                b.append(String.format("0x%02X", this[i]))
+                if (i == iMax) return b.append(']').toString()
+                b.append(", ")
+                ++i
+            }
+        }
     }
 }
