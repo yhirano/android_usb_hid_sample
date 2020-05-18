@@ -15,7 +15,7 @@ class ReadManager(private val port: Port, var listener: Listener? = null) : Runn
         STOPPED, RUNNING, STOPPING
     }
 
-    var timeout: Int = 10
+    var timeout: Int = 30
 
     private var state = State.STOPPED
 
@@ -38,7 +38,7 @@ class ReadManager(private val port: Port, var listener: Listener? = null) : Runn
                 if (state != State.RUNNING) {
                     break
                 }
-                Thread.sleep(1)
+                Thread.sleep(10)
             }
         } catch (e: Exception) {
             Log.w(TAG, "Occurred exception. exception=\"${e.message}\"", e)

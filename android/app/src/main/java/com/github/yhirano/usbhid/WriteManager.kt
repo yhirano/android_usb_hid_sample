@@ -1,7 +1,6 @@
 package com.github.yhirano.usbhid
 
 import android.util.Log
-import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.util.*
 
@@ -20,19 +19,33 @@ class WriteManager(private val port: Port, var listener: Listener? = null) : Run
         CAUSE_WRITE_ERROR,
     }
 
-    var writeDataAllTogether = false
-
-    var timeout: Int = 10
+    private class WriteData(val data: ByteArray, val retry: Int?)
 
     /**
-     * Retry send data count.
+     * USB data write timeout. in milliseconds, 0 is infinite.
+    */
+    var timeout: Int = 30
+
+    /**
+     * If there is data to write next, write the data without the thread to sleep.
+     * Not recommended for all devices.
+     */
+    var writeDataImmediatelyIfExists = false
+
+    /**
+     * Default number of retries on write error.
      * If it is less than or equal to 0, no retries.
      */
-    var retry: Int = 0
+    var defaultRetry: Int = 0
+
+    /**
+     * Sleeping time before retry bacause write data error.
+     */
+    var sleepMillisSecBeforeRetry: Long = 10
 
     private var state = State.STOPPED
 
-    private val writeDataQueue = LinkedList<ByteArray>()
+    private val writeDataQueue = LinkedList<WriteData>()
 
     override fun run() {
         synchronized(state) {
@@ -51,8 +64,8 @@ class WriteManager(private val port: Port, var listener: Listener? = null) : Run
                 if (state != State.RUNNING) {
                     break
                 }
-                if (workResult == WorkResult.QUEUE_IS_EMPTY) {
-                    Thread.sleep(1)
+                if (workResult == WorkResult.QUEUE_IS_EMPTY || !writeDataImmediatelyIfExists) {
+                    Thread.sleep(10)
                 }
             }
         } catch (e: Exception) {
@@ -73,35 +86,25 @@ class WriteManager(private val port: Port, var listener: Listener? = null) : Run
         }
     }
 
-    fun writeAsync(data: ByteArray) {
+    /**
+     * @param retry Number of retries at data write error. If null, the number of times specified in [defaultRetry].
+     */
+    fun writeAsync(data: ByteArray, retry: Int? = null) {
         synchronized(writeDataQueue) {
-            writeDataQueue.add(data)
+            writeDataQueue.add(WriteData(data, retry))
         }
     }
 
     private fun work(): WorkResult {
         return try {
-            val data = if (writeDataAllTogether) {
-                synchronized(writeDataQueue) {
-                    val outStream = ByteArrayOutputStream()
-                    while (true) {
-                        val data = writeDataQueue.poll() ?: break
-                        outStream.write(data)
-                    }
-                    return@synchronized if (outStream.size() > 0) {
-                        outStream.toByteArray()
-                    } else {
-                        null
-                    }
-                }
-            } else {
-                synchronized(writeDataQueue) {
-                    writeDataQueue.poll()
-                }
+            val writeData = synchronized(writeDataQueue) {
+                writeDataQueue.poll()
             }
 
-            if (data != null) {
-                write(data, timeout, retry)
+            if (writeData != null) {
+                val data = writeData.data
+                val retry = writeData.retry ?: defaultRetry
+                write(data, timeout, retry, sleepMillisSecBeforeRetry)
                 WorkResult.WROTE_DATA
             } else {
                 WorkResult.QUEUE_IS_EMPTY
@@ -117,24 +120,23 @@ class WriteManager(private val port: Port, var listener: Listener? = null) : Run
      * Write data to USB device.
      *
      * @param data Writing data
+     * @param timeout USB data write timeout. in milliseconds, 0 is infinite.
      * @param retry Number of retries; if this number is less than or equal to 0, no retries.
+     * @param sleepMillisSecBeforeRetry Sleeping time before retry.
      * @exception IOException When data is not written to USB after the specified number of retries.
      */
-    private fun write(data: ByteArray, timeout: Int, retry: Int) {
+    private fun write(data: ByteArray, timeout: Int, retry: Int, sleepMillisSecBeforeRetry: Long) {
         try {
             port.write(data, timeout)
         } catch (e: IOException) {
             if (retry > 0) {
-                Log.d(
-                    TAG,
-                    "Retry send data because occurred exception when USB writing. data=${data.contentToHexString()}, retry=$retry, exception=\"${e.message}\""
-                )
-                write(data, timeout, retry - 1)
+                Log.d(TAG, "Retry send data because occurred exception when USB writing. data=${data.contentToHexString()}, retry=$retry, exception=\"${e.message}\"")
+                if (sleepMillisSecBeforeRetry > 0) {
+                    Thread.sleep(sleepMillisSecBeforeRetry)
+                }
+                write(data, timeout, retry - 1, sleepMillisSecBeforeRetry)
             } else {
-                Log.w(
-                    TAG,
-                    "Failed to retry send data because occurred exception when USB writing. data=${data.contentToHexString()} exception=\"${e.message}\""
-                )
+                Log.w(TAG, "Failed to retry send data because occurred exception when USB writing. data=${data.contentToHexString()} exception=\"${e.message}\"")
                 throw e
             }
         }

@@ -24,19 +24,36 @@ class UsbHid constructor(
     }
 
     interface Listener {
+        /**
+         * Receive new data.
+         */
         fun onNewData(data: ByteArray)
 
+        /**
+         * Occurred error.
+         *
+         * @param e Occurred exception.
+         */
         fun onRunError(e: Exception)
 
+        /**
+         * Changed state.
+         *
+         * @param state state
+         */
         fun onStateChanged(state: State)
     }
 
     var listener: Listener? = null
 
-    var writeRetry: Int = 0
+    /**
+     * Default number of retries on write error.
+     * If it is less than or equal to 0, no retries.
+     */
+    var defaultRetry: Int = 0
         set(value) {
             field = value
-            writeManager?.retry = value
+            writeManager?.defaultRetry = value
         }
 
     var state = State.Uninitialized
@@ -85,8 +102,11 @@ class UsbHid constructor(
         }
     }
 
-    fun write(data: ByteArray) {
-        writeManager?.writeAsync(data)
+    /**
+     * @param retry Number of retries at data write error. If null, the number of times specified in [defaultRetry].
+     */
+    fun write(data: ByteArray, retry: Int? = null) {
+        writeManager?.writeAsync(data, retry)
             ?: Log.w(TAG, "Failed to write data to USB HID because UsbHid class isn't open.")
     }
 
@@ -164,7 +184,7 @@ class UsbHid constructor(
                 listener?.onRunError(e)
             }
         }).apply {
-            retry = writeRetry
+            defaultRetry = this@UsbHid.defaultRetry
         }
         this.readManager = readManager
         this.writeManager = writeManager
