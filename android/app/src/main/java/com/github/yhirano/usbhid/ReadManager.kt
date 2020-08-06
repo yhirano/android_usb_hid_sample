@@ -4,7 +4,11 @@ import android.util.Log
 import java.io.IOException
 import java.nio.ByteBuffer
 
-class ReadManager(private val port: Port, var listener: Listener? = null) : Runnable {
+internal class ReadManager(
+    private val port: Port,
+    @Suppress("unused")
+    var listener: Listener? = null
+) : Runnable {
     interface Listener {
         fun onNewData(data: ByteArray)
 
@@ -15,6 +19,7 @@ class ReadManager(private val port: Port, var listener: Listener? = null) : Runn
         STOPPED, RUNNING, STOPPING
     }
 
+    @Suppress("unused")
     var timeout: Int = 30
 
     private var state = State.STOPPED

@@ -95,7 +95,11 @@ class UsbHid constructor(
 
     fun closeDevice() {
         state = disconnect()
-        context.unregisterReceiver(usbAttachReceiver)
+        try {
+            context.unregisterReceiver(usbAttachReceiver)
+        } catch (e: IllegalArgumentException) {
+            Log.i(TAG, "Ignore IllegalArgumentException because usbAttachReceiver isn't attached.", e)
+        }
         if (isRegisterUsbPermissionReceiver) {
             context.unregisterReceiver(usbPermissionReceiver)
             isRegisterUsbPermissionReceiver = false
@@ -170,15 +174,17 @@ class UsbHid constructor(
             Log.w(TAG, "Has no USB device. Maybe not initialize yet.")
             return
         }
-        val readManager = ReadManager(port, object : ReadManager.Listener {
-            override fun onNewData(data: ByteArray) {
-                listener?.onNewData(data)
-            }
+        val readManager = ReadManager(
+            port,
+            object : ReadManager.Listener {
+                override fun onNewData(data: ByteArray) {
+                    listener?.onNewData(data)
+                }
 
-            override fun onRunError(e: Exception) {
-                listener?.onRunError(e)
-            }
-        })
+                override fun onRunError(e: Exception) {
+                    listener?.onRunError(e)
+                }
+            })
         val writeManager = WriteManager(port, object : WriteManager.Listener {
             override fun onRunError(e: Exception) {
                 listener?.onRunError(e)

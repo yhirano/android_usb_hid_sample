@@ -1,6 +1,7 @@
 package com.github.yhirano.usbhid
 
 import android.hardware.usb.*
+import android.util.Log
 import java.io.IOException
 
 class Port private constructor(
@@ -15,38 +16,28 @@ class Port private constructor(
     }
 
     fun close() {
+        connection.releaseInterface(usbInterface)
         connection.close()
     }
 
 
     fun read(dest: ByteArray, timeout: Int): Int {
-        val length: Int
-        try {
-            connection.claimInterface(usbInterface, true)
-            length = connection.bulkTransfer(readEndpoint, dest, dest.size, timeout)
-        } finally {
-            connection.releaseInterface(usbInterface)
-        }
-        return length
+        return connection.bulkTransfer(readEndpoint, dest, dest.size, timeout)
     }
 
     /**
      * @exception IOException Failed to write data to USB.
      */
     fun write(data: ByteArray, timeout: Int) {
-        try {
-            connection.claimInterface(usbInterface, true)
-
-            val length = connection.bulkTransfer(writeEndpoint, data, data.size, timeout)
-            if (length <= 0) {
-                throw IOException("Failed to write data to USB. status=$length")
-            }
-        } finally {
-            connection.releaseInterface(usbInterface)
+        val length = connection.bulkTransfer(writeEndpoint, data, data.size, timeout)
+        if (length <= 0) {
+            throw IOException("Failed to write data to USB. status=$length")
         }
     }
 
     companion object {
+        private const val TAG = "UsbHid/Port"
+
         fun create(device: UsbDevice, connection: UsbDeviceConnection): Port? {
             val interfaceCount = device.interfaceCount
             for (ii in 0 until interfaceCount) {
@@ -73,7 +64,20 @@ class Port private constructor(
                     }
 
                     if (readEndpoint != null && writeEndpoint != null) {
-                        return Port(device, connection, usbInterface, readEndpoint, writeEndpoint)
+                        val connected = connection.claimInterface(usbInterface, true)
+                        if (!connected) {
+                            Log.w(TAG, "Failed to connect to USB device. Interface could not be claimed.")
+                            connection.close()
+                            return null
+                        }
+
+                        return Port(
+                            device,
+                            connection,
+                            usbInterface,
+                            readEndpoint,
+                            writeEndpoint
+                        )
                     }
                 }
             }

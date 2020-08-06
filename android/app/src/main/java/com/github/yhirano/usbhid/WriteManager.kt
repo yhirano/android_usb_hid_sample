@@ -4,7 +4,7 @@ import android.util.Log
 import java.io.IOException
 import java.util.*
 
-class WriteManager(private val port: Port, var listener: Listener? = null) : Runnable {
+internal class WriteManager(private val port: Port, var listener: Listener? = null) : Runnable {
     interface Listener {
         fun onRunError(e: Exception)
     }
@@ -24,12 +24,14 @@ class WriteManager(private val port: Port, var listener: Listener? = null) : Run
     /**
      * USB data write timeout. in milliseconds, 0 is infinite.
     */
+    @Suppress("unused")
     var timeout: Int = 30
 
     /**
      * If there is data to write next, write the data without the thread to sleep.
      * Not recommended for all devices.
      */
+    @Suppress("unused")
     var writeDataImmediatelyIfExists = false
 
     /**
@@ -41,6 +43,7 @@ class WriteManager(private val port: Port, var listener: Listener? = null) : Run
     /**
      * Sleeping time before retry bacause write data error.
      */
+    @Suppress("unused")
     var sleepMillisSecBeforeRetry: Long = 10
 
     private var state = State.STOPPED
